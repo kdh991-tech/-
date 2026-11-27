@@ -222,11 +222,11 @@ function renderMemos() {
               <div class="reply-form-row">
                 <select id="reply-author-${m.id}">
                   <option value="도형님" selected>👤 도형님</option>
-                  <option value="비글">🐶 비글</option>
-                  <option value="피구">📱 피구</option>
-                  <option value="키루루">🔑 키루루</option>
-                  <option value="쿠링">🔔 쿠링</option>
-                  <option value="구구">🕊️ 구구</option>
+                  <option value="비글">🐶 비글 (실장)</option>
+                  <option value="피구">📱 피구 (대리)</option>
+                  <option value="키루루">🔑 키루루 (사원)</option>
+                  <option value="쿠링">🔔 쿠링 (사원)</option>
+                  <option value="구구">🕊️ 구구 (인턴)</option>
                 </select>
                 <input id="reply-text-${m.id}" type="text" placeholder="답글을 입력하세요..." />
               </div>
