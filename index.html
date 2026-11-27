@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>피클 합동 비서실</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- PIN 잠금 화면 -->
+  <div id="lock-screen" class="lock-screen">
+    <div class="lock-card">
+      <div class="lock-logo">🥒</div>
+      <h1>피클 합동 비서실</h1>
+      <p class="lock-sub">도형님 · 비글 · 피구 · 키루루 공유 워크스페이스</p>
+      <form id="pin-form" class="pin-form">
+        <input
+          id="pin-input"
+          type="password"
+          inputmode="numeric"
+          maxlength="12"
+          placeholder="비밀번호 입력"
+          autocomplete="off"
+          required
+        />
+        <button type="submit" class="btn-primary">입장하기</button>
+      </form>
+      <p id="pin-error" class="pin-error hidden">비밀번호가 맞지 않거나 DB 연결에 실패했습니다.</p>
+      <p class="lock-note">※ 개인정보는 저장하지 않으며, 업무 현황만 공유합니다.</p>
+    </div>
+  </div>
+
+  <!-- 메인 대시보드 -->
+  <div id="app-screen" class="app-screen hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="brand-icon">🥒</span>
+        <div>
+          <h1 class="brand-title">피클 합동 비서실</h1>
+          <span id="sync-status" class="sync-badge">실시간 연결 중...</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button id="lock-btn" class="btn-ghost" title="잠금">🔒 잠그기</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="memos">💬 공유 메모</button>
+      <button class="tab" data-tab="surveys">📋 설문 현황</button>
+      <button class="tab" data-tab="blogs">✍️ 블로그 보드</button>
+      <button class="tab" data-tab="api">🤖 AI 연동</button>
+    </nav>
+
+    <main class="container">
+      <!-- 1. 공유 메모 & 지시 -->
+      <section id="tab-memos" class="tab-panel active">
+        <form id="memo-form" class="card form-card">
+          <div class="form-row">
+            <select id="memo-author" required>
+              <option value="도형님">👤 도형님</option>
+              <option value="비글" selected>🐶 비글 (메인)</option>
+              <option value="피구">📱 피구 (막내)</option>
+              <option value="키루루">🔑 키루루</option>
+              <option value="희주님피클">💐 희주님 피클</option>
+            </select>
+            <select id="memo-tag" required>
+              <option value="전달">📌 전달</option>
+              <option value="지시">⚡ 지시</option>
+              <option value="보고">✅ 보고</option>
+              <option value="아이디어">💡 아이디어</option>
+            </select>
+          </div>
+          <textarea id="memo-text" rows="2" placeholder="메모나 전달사항을 남겨주세요..." required></textarea>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">메모 등록</button>
+          </div>
+        </form>
+        <div id="memo-list" class="stack-list"></div>
+      </section>
+
+      <!-- 2. 설문 현황판 -->
+      <section id="tab-surveys" class="tab-panel">
+        <div class="stats-grid" id="survey-stats"></div>
+
+        <details class="card accordion">
+          <summary>+ 새 설문 / 이벤트 추가</summary>
+          <form id="survey-form" class="form-card inner-form">
+            <div class="form-row">
+              <input id="survey-no" type="text" placeholder="번호 (예: #217)" />
+              <input id="survey-title" type="text" placeholder="이벤트/기관명 *" required />
+            </div>
+            <div class="form-row">
+              <input id="survey-prize" type="text" placeholder="경품 (예: 스타벅스 아메리카노)" />
+              <select id="survey-owner">
+                <option value="피구">담당: 피구</option>
+                <option value="비글">담당: 비글</option>
+                <option value="키루루">담당: 키루루</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <input id="survey-deadline" type="text" placeholder="마감일 (예: 11/30)" />
+              <input id="survey-announce" type="text" placeholder="발표일 (예: 12/04)" />
+            </div>
+            <div class="form-row">
+              <select id="survey-status">
+                <option value="진행중">진행중</option>
+                <option value="발표대기">발표대기</option>
+                <option value="당첨">당첨</option>
+                <option value="미당첨">미당첨</option>
+                <option value="마감">마감</option>
+              </select>
+              <input id="survey-url" type="url" placeholder="링크 (선택)" />
+            </div>
+            <input id="survey-note" type="text" placeholder="메모 (주관식/참고사항)" />
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">설문 추가</button>
+            </div>
+          </form>
+        </details>
+
+        <div class="filter-bar">
+          <input id="survey-search" type="search" placeholder="기관명·경품·번호 검색..." />
+          <select id="survey-filter">
+            <option value="ALL">전체 상태</option>
+            <option value="진행중">진행중</option>
+            <option value="발표대기">발표대기</option>
+            <option value="당첨">당첨</option>
+            <option value="미당첨">미당첨</option>
+            <option value="마감">마감</option>
+          </select>
+        </div>
+
+        <div id="survey-list" class="stack-list"></div>
+      </section>
+
+      <!-- 3. 블로그 작업 보드 -->
+      <section id="tab-blogs" class="tab-panel">
+        <div class="stats-grid" id="blog-stats"></div>
+
+        <details class="card accordion">
+          <summary>+ 새 블로그 글 등록</summary>
+          <form id="blog-form" class="form-card inner-form">
+            <div class="form-row">
+              <select id="blog-platform" required>
+                <option value="티스토리">티스토리</option>
+                <option value="네이버">네이버 블로그</option>
+              </select>
+              <select id="blog-status" required>
+                <option value="초안">초안</option>
+                <option value="임시저장">임시저장</option>
+                <option value="예약발행">예약발행</option>
+                <option value="발행완료">발행완료</option>
+              </select>
+            </div>
+            <input id="blog-title" type="text" placeholder="글 제목 / 주제 *" required />
+            <div class="form-row">
+              <input id="blog-date" type="text" placeholder="예약/발행일 (예: 11/28 08:10)" />
+              <select id="blog-owner">
+                <option value="비글">작성: 비글</option>
+                <option value="피구">작성: 피구</option>
+                <option value="키루루">작성: 키루루</option>
+                <option value="도형님">작성: 도형님</option>
+              </select>
+            </div>
+            <input id="blog-keywords" type="text" placeholder="타겟 키워드 / 태그 메모" />
+            <input id="blog-url" type="url" placeholder="발행 링크 (선택)" />
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">글 등록</button>
+            </div>
+          </form>
+        </details>
+
+        <div class="filter-bar">
+          <select id="blog-platform-filter">
+            <option value="ALL">전체 플랫폼</option>
+            <option value="티스토리">티스토리</option>
+            <option value="네이버">네이버 블로그</option>
+          </select>
+          <select id="blog-status-filter">
+            <option value="ALL">전체 상태</option>
+            <option value="초안">초안</option>
+            <option value="임시저장">임시저장</option>
+            <option value="예약발행">예약발행</option>
+            <option value="발행완료">발행완료</option>
+          </select>
+        </div>
+
+        <div id="blog-list" class="stack-list"></div>
+      </section>
+
+      <!-- 4. AI 연동 가이드 -->
+      <section id="tab-api" class="tab-panel">
+        <div class="card">
+          <h2>🤖 다른 AI / 피클 연동 가이드</h2>
+          <p class="muted">
+            브라우저가 있는 AI(비글·피구)는 이 웹페이지에서 비밀번호 입력 후 바로 사용할 수 있고,
+            REST API 호출이 가능한 AI는 아래 엔드포인트로 JSON 데이터를 실시간 읽고 쓸 수 있습니다.
+          </p>
+          <div class="api-box">
+            <label>공유 DB 기본 경로 (Base URL)</label>
+            <div class="copy-row">
+              <code id="api-base-url"></code>
+              <button type="button" class="btn-small" data-copy="api-base-url">복사</button>
+            </div>
+          </div>
+          <div class="api-box">
+            <label>전체 데이터 읽기 (GET)</label>
+            <code id="api-get-example"></code>
+          </div>
+          <div class="api-box">
+            <label>공유 메모 추가 (POST)</label>
+            <code id="api-post-example"></code>
+          </div>
+          <p class="muted small-note">
+            ※ 위 URL에는 접속 키가 포함되어 있으므로 외부 공개 채널에 그대로 붙여넣지 마세요.
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
