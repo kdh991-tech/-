@@ -19,6 +19,7 @@ let currentRoomKey = null;
 let unsubs = [];
 let cachedMemos = [];
 let editingMemoId = null;
+let replyingMemoId = null;
 let cachedImages = [];
 let cachedSurveys = [];
 let cachedBlogs = [];
@@ -155,6 +156,10 @@ function renderMemos() {
   el.innerHTML = cachedMemos
     .map((m) => {
       const isEditing = editingMemoId === m.id;
+      const isReplying = replyingMemoId === m.id;
+      const replies = Object.entries(m.replies || {})
+        .map(([rid, r]) => ({ rid, ...r }))
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
       return `
     <div class="item-card ${m.done ? "is-done" : ""}">
       <div class="item-head">
@@ -184,6 +189,7 @@ function renderMemos() {
         <div class="item-foot">
           <span></span>
           <div class="item-actions">
+            <button class="btn-small" data-reply-open="${m.id}">💬 답글${replies.length ? ` (${replies.length})` : ""}</button>
             <button class="btn-small" data-memo-edit="${m.id}">✏️ 수정</button>
             <button class="btn-small" data-memo-toggle="${m.id}" data-done="${Boolean(m.done)}">
               ${m.done ? "↩️ 다시 열기" : "✔️ 확인 완료"}
@@ -191,6 +197,44 @@ function renderMemos() {
             <button class="btn-small btn-danger" data-memo-del="${m.id}">삭제</button>
           </div>
         </div>`
+      }
+      ${
+        replies.length
+          ? `<div class="memo-replies">
+              ${replies
+                .map(
+                  (r) => `
+                <div class="reply-item">
+                  <div class="reply-head">
+                    <span><strong>${escapeHtml(r.author || "비서")}</strong> <span class="muted">${formatTime(r.createdAt)}</span></span>
+                    <button type="button" class="reply-del-btn" data-reply-del="${m.id}/${r.rid}" title="답글 삭제">✕</button>
+                  </div>
+                  <div class="reply-text">${escapeHtml(r.text)}</div>
+                </div>`
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
+      ${
+        isReplying
+          ? `<div class="reply-form-box">
+              <div class="reply-form-row">
+                <select id="reply-author-${m.id}">
+                  <option value="도형님" selected>👤 도형님</option>
+                  <option value="비글">🐶 비글</option>
+                  <option value="피구">📱 피구</option>
+                  <option value="키루루">🔑 키루루</option>
+                  <option value="쿠링">🔔 쿠링</option>
+                </select>
+                <input id="reply-text-${m.id}" type="text" placeholder="답글을 입력하세요..." />
+              </div>
+              <div class="memo-edit-actions">
+                <button type="button" class="btn-small" data-reply-cancel="${m.id}">취소</button>
+                <button type="button" class="btn-primary" style="padding:5px 12px;font-size:12px;" data-reply-save="${m.id}">답글 등록</button>
+              </div>
+            </div>`
+          : ""
       }
     </div>`;
     })
@@ -527,7 +571,26 @@ document.addEventListener("click", async (e) => {
     }
     return;
   }
-  if (t.dataset.memoEdit) {
+  if (t.dataset.replyOpen) {
+    replyingMemoId = replyingMemoId === t.dataset.replyOpen ? null : t.dataset.replyOpen;
+    renderMemos();
+  } else if (t.dataset.replyCancel) {
+    replyingMemoId = null;
+    renderMemos();
+  } else if (t.dataset.replySave) {
+    const id = t.dataset.replySave;
+    const text = $(`reply-text-${id}`).value.trim();
+    const author = $(`reply-author-${id}`).value;
+    if (!text) return;
+    await push(roomRef(`memos/${id}/replies`), {
+      author,
+      text,
+      createdAt: Date.now(),
+    });
+    replyingMemoId = null;
+  } else if (t.dataset.replyDel) {
+    await remove(roomRef(`memos/${t.dataset.replyDel}`));
+  } else if (t.dataset.memoEdit) {
     editingMemoId = t.dataset.memoEdit;
     renderMemos();
   } else if (t.dataset.memoCancel) {
