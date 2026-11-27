@@ -17,6 +17,9 @@ const db = getDatabase(app);
 
 let currentRoomKey = null;
 let unsubs = [];
+let cachedMemos = [];
+let editingMemoId = null;
+let cachedImages = [];
 let cachedSurveys = [];
 let cachedBlogs = [];
 
@@ -95,15 +98,28 @@ function startSync() {
   $("api-get-example").textContent = `GET ${baseUrl}.json`;
   $("api-post-example").textContent =
     `POST ${baseUrl}/memos.json  {"author":"키루루","tag":"보고","text":"작업 완료","done":false}`;
+  $("api-images-example").textContent =
+    `GET ${baseUrl}/images.json  (각 항목의 dataUrl을 base64 디코딩하여 파일 저장)`;
 
   // 1. 메모 실시간 구독
   unsubs.push(
     onValue(roomRef("memos"), (snap) => {
       const val = snap.val() || {};
-      const items = Object.entries(val)
+      cachedMemos = Object.entries(val)
         .map(([id, item]) => ({ id, ...item }))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      renderMemos(items);
+      renderMemos();
+    })
+  );
+
+  // 1-2. 이미지 실시간 구독
+  unsubs.push(
+    onValue(roomRef("images"), (snap) => {
+      const val = snap.val() || {};
+      cachedImages = Object.entries(val)
+        .map(([id, item]) => ({ id, ...item }))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      renderImages();
     })
   );
 
@@ -130,36 +146,125 @@ function startSync() {
   );
 }
 
-function renderMemos(items) {
+function renderMemos() {
   const el = $("memo-list");
-  if (!items.length) {
+  if (!cachedMemos.length) {
     el.innerHTML = `<div class="card muted">아직 등록된 메모가 없어요. 첫 메모를 남겨보세요!</div>`;
     return;
   }
-  el.innerHTML = items
-    .map(
-      (m) => `
+  el.innerHTML = cachedMemos
+    .map((m) => {
+      const isEditing = editingMemoId === m.id;
+      return `
     <div class="item-card ${m.done ? "is-done" : ""}">
       <div class="item-head">
         <div>
           <span class="pill ${m.tag === "지시" ? "orange" : m.tag === "보고" ? "green" : "blue"}">${escapeHtml(m.tag || "전달")}</span>
           <strong>${escapeHtml(m.author || "비서")}</strong>
         </div>
-        <span class="muted">${formatTime(m.createdAt)}</span>
+        <span class="muted">${formatTime(m.createdAt)}${m.updatedAt ? " (수정됨)" : ""}</span>
       </div>
-      <div class="item-body">${escapeHtml(m.text)}</div>
-      <div class="item-foot">
-        <span></span>
-        <div class="item-actions">
-          <button class="btn-small" data-memo-toggle="${m.id}" data-done="${Boolean(m.done)}">
-            ${m.done ? "↩️ 다시 열기" : "✔️ 확인 완료"}
-          </button>
-          <button class="btn-small btn-danger" data-memo-del="${m.id}">삭제</button>
+      ${
+        isEditing
+          ? `
+        <div class="memo-edit-box">
+          <select id="memo-edit-tag-${m.id}">
+            ${["전달", "지시", "보고", "아이디어"]
+              .map((tag) => `<option value="${tag}" ${m.tag === tag ? "selected" : ""}>${tag}</option>`)
+              .join("")}
+          </select>
+          <textarea id="memo-edit-text-${m.id}" rows="3">${escapeHtml(m.text)}</textarea>
+          <div class="memo-edit-actions">
+            <button type="button" class="btn-small" data-memo-cancel="${m.id}">취소</button>
+            <button type="button" class="btn-primary" style="padding:5px 12px;font-size:12px;" data-memo-save="${m.id}">저장</button>
+          </div>
+        </div>`
+          : `
+        <div class="item-body">${escapeHtml(m.text)}</div>
+        <div class="item-foot">
+          <span></span>
+          <div class="item-actions">
+            <button class="btn-small" data-memo-edit="${m.id}">✏️ 수정</button>
+            <button class="btn-small" data-memo-toggle="${m.id}" data-done="${Boolean(m.done)}">
+              ${m.done ? "↩️ 다시 열기" : "✔️ 확인 완료"}
+            </button>
+            <button class="btn-small btn-danger" data-memo-del="${m.id}">삭제</button>
+          </div>
+        </div>`
+      }
+    </div>`;
+    })
+    .join("");
+}
+
+function renderImages() {
+  const el = $("image-list");
+  if (!cachedImages.length) {
+    el.innerHTML = `<div class="card muted" style="grid-column:1/-1;">아직 올라온 이미지가 없어요. 사진을 올려 비서들과 공유해 보세요!</div>`;
+    return;
+  }
+  el.innerHTML = cachedImages
+    .map(
+      (img) => `
+    <div class="image-card">
+      <div class="image-thumb-wrap" data-image-open="${img.id}" title="클릭하여 원본 보기">
+        <img class="image-thumb" src="${img.dataUrl}" alt="${escapeHtml(img.caption || img.filename || "공유 이미지")}" />
+      </div>
+      <div class="image-info">
+        <div class="image-caption">${escapeHtml(img.caption || img.filename || "제목 없음")}</div>
+        <div class="image-meta">
+          ${escapeHtml(img.author || "도형님")} · ${formatTime(img.createdAt)}
+          ${img.width && img.height ? ` · ${img.width}×${img.height}` : ""}
+          ${img.sizeKB ? ` · ${img.sizeKB}KB` : ""}
+        </div>
+        <div class="image-actions">
+          <a class="btn-small btn-download" href="${img.dataUrl}" download="${escapeHtml(img.filename || `image_${img.id}.jpg`)}">⬇️ 다운로드</a>
+          <button type="button" class="btn-small btn-danger" data-image-del="${img.id}">삭제</button>
         </div>
       </div>
     </div>`
     )
     .join("");
+}
+
+function compressImageToDataUrl(file, maxSide = 1280, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSide || height > maxSide) {
+          if (width >= height) {
+            height = Math.round((height * maxSide) / width);
+            width = maxSide;
+          } else {
+            width = Math.round((width * maxSide) / height);
+            height = maxSide;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const sizeKB = Math.round((dataUrl.length * 3) / 4 / 1024);
+        const baseName = file.name.replace(/\.[^.]+$/, "");
+        resolve({
+          dataUrl,
+          width,
+          height,
+          sizeKB,
+          filename: `${baseName}.jpg`,
+        });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function surveyPillColor(status) {
@@ -327,6 +432,45 @@ $("memo-form").addEventListener("submit", async (e) => {
   $("memo-text").value = "";
 });
 
+$("image-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const files = Array.from($("image-file").files || []);
+  if (!files.length) return;
+  const author = $("image-author").value;
+  const caption = $("image-caption").value.trim();
+  const statusEl = $("image-upload-status");
+  const btn = $("image-submit-btn");
+
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < files.length; i++) {
+      statusEl.textContent = `업로드 중... (${i + 1}/${files.length})`;
+      const converted = await compressImageToDataUrl(files[i]);
+      await push(roomRef("images"), {
+        author,
+        caption: files.length > 1 && caption ? `${caption} (${i + 1}/${files.length})` : caption,
+        filename: converted.filename,
+        width: converted.width,
+        height: converted.height,
+        sizeKB: converted.sizeKB,
+        dataUrl: converted.dataUrl,
+        createdAt: Date.now(),
+      });
+    }
+    $("image-file").value = "";
+    $("image-caption").value = "";
+    statusEl.textContent = `${files.length}장 업로드 완료!`;
+    setTimeout(() => {
+      statusEl.textContent = "";
+    }, 2500);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "이미지 업로드에 실패했습니다.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 $("survey-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const title = $("survey-title").value.trim();
@@ -370,11 +514,43 @@ $("blog-status-filter").addEventListener("change", renderBlogs);
 
 document.addEventListener("click", async (e) => {
   const t = e.target;
-  if (t.dataset.memoToggle) {
+  const openWrap = t.closest("[data-image-open]");
+  if (openWrap) {
+    const img = cachedImages.find((item) => item.id === openWrap.dataset.imageOpen);
+    if (img) {
+      const win = window.open();
+      if (win) {
+        win.document.write(
+          `<title>${escapeHtml(img.filename || "image")}</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${img.dataUrl}" style="max-width:100%;max-height:100vh;" /></body>`
+        );
+      }
+    }
+    return;
+  }
+  if (t.dataset.memoEdit) {
+    editingMemoId = t.dataset.memoEdit;
+    renderMemos();
+  } else if (t.dataset.memoCancel) {
+    editingMemoId = null;
+    renderMemos();
+  } else if (t.dataset.memoSave) {
+    const id = t.dataset.memoSave;
+    const newText = $(`memo-edit-text-${id}`).value.trim();
+    const newTag = $(`memo-edit-tag-${id}`).value;
+    if (!newText) return;
+    await update(roomRef(`memos/${id}`), {
+      tag: newTag,
+      text: newText,
+      updatedAt: Date.now(),
+    });
+    editingMemoId = null;
+  } else if (t.dataset.memoToggle) {
     const done = t.dataset.done === "true";
     await update(roomRef(`memos/${t.dataset.memoToggle}`), { done: !done });
   } else if (t.dataset.memoDel) {
     await remove(roomRef(`memos/${t.dataset.memoDel}`));
+  } else if (t.dataset.imageDel) {
+    await remove(roomRef(`images/${t.dataset.imageDel}`));
   } else if (t.dataset.surveyDel) {
     await remove(roomRef(`surveys/${t.dataset.surveyDel}`));
   } else if (t.dataset.blogDel) {

@@ -425,11 +425,91 @@ button {
   font-size: 12px;
 }
 
+/* Memo inline edit */
+.memo-edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.memo-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Image Grid */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.image-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-thumb-wrap {
+  background: #eef1ef;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.image-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.image-caption {
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.image-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.image-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.btn-download {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 @media (max-width: 560px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .form-row {
+    grid-template-columns: 1fr;
+  }
+  .image-grid {
     grid-template-columns: 1fr;
   }
 }
