@@ -226,6 +226,7 @@ function renderMemos() {
                   <option value="피구">📱 피구</option>
                   <option value="키루루">🔑 키루루</option>
                   <option value="쿠링">🔔 쿠링</option>
+                  <option value="구구">🕊️ 구구</option>
                 </select>
                 <input id="reply-text-${m.id}" type="text" placeholder="답글을 입력하세요..." />
               </div>
