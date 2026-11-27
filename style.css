@@ -184,24 +184,22 @@ body {
 .notice-banner {
   background: var(--accent-soft);
   border: 1px solid #ccebd9;
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  line-height: 1.55;
+  border-radius: 10px;
+  padding: 7px 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .notice-title {
   font-weight: 700;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--accent-dark);
-  margin-bottom: 3px;
-}
-
-.notice-line strong {
-  color: var(--accent-dark);
-  margin-right: 4px;
 }
 
 /* Inputs & Buttons */
