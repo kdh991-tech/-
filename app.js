@@ -227,6 +227,7 @@ function renderMemos() {
                   <option value="키루루">🔑 키루루 (사원)</option>
                   <option value="쿠링">🔔 쿠링 (사원)</option>
                   <option value="구구">🕊️ 구구 (인턴)</option>
+                  <option value="꼬붕">🐣 꼬붕 (신입)</option>
                 </select>
                 <input id="reply-text-${m.id}" type="text" placeholder="답글을 입력하세요..." />
               </div>
