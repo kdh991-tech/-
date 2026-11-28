@@ -21,6 +21,7 @@ let cachedMemos = [];
 let editingMemoId = null;
 let replyingMemoId = null;
 let cachedImages = [];
+let cachedDrafts = [];
 let cachedSurveys = [];
 let cachedBlogs = [];
 
@@ -101,6 +102,8 @@ function startSync() {
     `POST ${baseUrl}/memos.json  {"author":"키루루","tag":"보고","text":"작업 완료","done":false}`;
   $("api-images-example").textContent =
     `GET ${baseUrl}/images.json  (각 항목의 dataUrl을 base64 디코딩하여 파일 저장)`;
+  $("api-drafts-example").textContent =
+    `POST ${baseUrl}/drafts.json  {"author":"구구","platform":"티스토리","title":"제목","filename":"post.md","content":"본문...","status":"검수대기"}`;
 
   // 1. 메모 실시간 구독
   unsubs.push(
@@ -121,6 +124,17 @@ function startSync() {
         .map(([id, item]) => ({ id, ...item }))
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       renderImages();
+    })
+  );
+
+  // 1-3. 초안·파일 실시간 구독
+  unsubs.push(
+    onValue(roomRef("drafts"), (snap) => {
+      const val = snap.val() || {};
+      cachedDrafts = Object.entries(val)
+        .map(([id, item]) => ({ id, ...item }))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      renderDrafts();
     })
   );
 
@@ -309,6 +323,95 @@ function compressImageToDataUrl(file, maxSide = 1280, quality = 0.85) {
       };
       img.src = reader.result;
     };
+    reader.readAsDataURL(file);
+  });
+}
+
+function draftPillColor(status) {
+  if (status === "반영완료") return "green";
+  if (status === "검수완료") return "blue";
+  if (status === "검수대기") return "orange";
+  if (status === "수정필요") return "red";
+  return "";
+}
+
+function renderDrafts() {
+  const q = $("draft-search").value.trim().toLowerCase();
+  const pf = $("draft-platform-filter").value;
+  const sf = $("draft-status-filter").value;
+  const filtered = cachedDrafts.filter((d) => {
+    if (pf !== "ALL" && d.platform !== pf) return false;
+    if (sf !== "ALL" && d.status !== sf) return false;
+    if (!q) return true;
+    return [d.title, d.author, d.filename, d.keywords, d.content]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+
+  const el = $("draft-list");
+  if (!filtered.length) {
+    el.innerHTML = `<div class="card muted">등록된 초안이나 파일이 없습니다.</div>`;
+    return;
+  }
+
+  el.innerHTML = filtered
+    .map((d) => {
+      const hasContent = Boolean(d.content);
+      const hasFile = Boolean(d.content || d.dataUrl);
+      const lineCount = hasContent ? d.content.split(/\r?\n/).length : 0;
+      const charCount = hasContent ? d.content.length : 0;
+      return `
+    <div class="item-card">
+      <div class="item-head">
+        <div class="item-title">
+          <span class="pill">${escapeHtml(d.platform || "기타")}</span>
+          ${escapeHtml(d.title || d.filename || "제목 없음")}
+        </div>
+        <span class="pill ${draftPillColor(d.status)}">${escapeHtml(d.status || "검수대기")}</span>
+      </div>
+      <div class="item-meta">
+        <span>${escapeHtml(d.author || "비서")} · ${formatTime(d.createdAt)}</span>
+        ${d.filename ? `<span class="draft-file-badge">📄 ${escapeHtml(d.filename)}${d.sizeKB ? ` (${d.sizeKB}KB)` : ""}</span>` : ""}
+      </div>
+      ${d.keywords ? `<div class="item-body muted">🏷️ ${escapeHtml(d.keywords)}</div>` : ""}
+      ${
+        hasContent
+          ? `<details class="draft-preview">
+              <summary>본문 미리보기 (${charCount.toLocaleString()}자 · ${lineCount}줄)</summary>
+              <pre>${escapeHtml(d.content)}</pre>
+            </details>`
+          : ""
+      }
+      <div class="item-foot">
+        <div class="item-actions">
+          ${hasContent ? `<button type="button" class="btn-small" data-draft-copy="${d.id}">📋 원문 복사</button>` : ""}
+          ${hasFile ? `<button type="button" class="btn-small" data-draft-download="${d.id}">⬇️ 다운로드</button>` : ""}
+        </div>
+        <div class="item-actions">
+          <select class="status-select" data-draft-status="${d.id}">
+            ${["검수대기", "수정필요", "검수완료", "반영완료"]
+              .map((opt) => `<option value="${opt}" ${d.status === opt ? "selected" : ""}>${opt}</option>`)
+              .join("")}
+          </select>
+          <button type="button" class="btn-small btn-danger" data-draft-del="${d.id}">삭제</button>
+        </div>
+      </div>
+    </div>`;
+    })
+    .join("");
+}
+
+function isTextDraftFile(file) {
+  const name = (file.name || "").toLowerCase();
+  if (/\.(md|txt|html|htm|csv|json|xml|yaml|yml|log)$/.test(name)) return true;
+  return (file.type || "").startsWith("text/");
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => resolve(reader.result);
     reader.readAsDataURL(file);
   });
 }
@@ -517,6 +620,77 @@ $("image-form").addEventListener("submit", async (e) => {
   }
 });
 
+$("draft-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("draft-title").value.trim();
+  const textInput = $("draft-content").value.trim();
+  const file = ($("draft-file").files || [])[0];
+  const statusEl = $("draft-upload-status");
+  const btn = $("draft-submit-btn");
+
+  if (!title) return;
+  if (!file && !textInput) {
+    statusEl.textContent = "파일을 첨부하거나 초안 본문을 입력해 주세요.";
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = "등록 중...";
+  try {
+    let filename = "";
+    let mimeType = "text/markdown";
+    let sizeKB = 0;
+    let content = textInput;
+    let dataUrl = "";
+
+    if (file) {
+      if (file.size > 3 * 1024 * 1024) {
+        statusEl.textContent = "파일 크기는 3MB 이하만 올릴 수 있어요.";
+        btn.disabled = false;
+        return;
+      }
+      filename = file.name;
+      mimeType = file.type || "application/octet-stream";
+      sizeKB = Math.max(1, Math.round(file.size / 1024));
+      if (isTextDraftFile(file)) {
+        const fileText = await file.text();
+        content = textInput ? `${textInput}\n\n${fileText}` : fileText;
+      } else {
+        dataUrl = await readFileAsDataUrl(file);
+      }
+    } else {
+      const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 40) || "draft";
+      filename = `${safeTitle}.md`;
+      sizeKB = Math.max(1, Math.round(new Blob([content]).size / 1024));
+    }
+
+    await push(roomRef("drafts"), {
+      author: $("draft-author").value,
+      platform: $("draft-platform").value,
+      title,
+      keywords: $("draft-keywords").value.trim(),
+      filename,
+      mimeType,
+      sizeKB,
+      content: content || "",
+      dataUrl: dataUrl || "",
+      status: "검수대기",
+      createdAt: Date.now(),
+    });
+
+    e.target.reset();
+    statusEl.textContent = "등록 완료!";
+    setTimeout(() => {
+      statusEl.textContent = "";
+    }, 2500);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "초안/파일 등록에 실패했습니다.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 $("survey-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const title = $("survey-title").value.trim();
@@ -553,6 +727,9 @@ $("blog-form").addEventListener("submit", async (e) => {
   e.target.reset();
 });
 
+$("draft-search").addEventListener("input", renderDrafts);
+$("draft-platform-filter").addEventListener("change", renderDrafts);
+$("draft-status-filter").addEventListener("change", renderDrafts);
 $("survey-search").addEventListener("input", renderSurveys);
 $("survey-filter").addEventListener("change", renderSurveys);
 $("blog-platform-filter").addEventListener("change", renderBlogs);
@@ -616,6 +793,31 @@ document.addEventListener("click", async (e) => {
     await remove(roomRef(`memos/${t.dataset.memoDel}`));
   } else if (t.dataset.imageDel) {
     await remove(roomRef(`images/${t.dataset.imageDel}`));
+  } else if (t.dataset.draftCopy) {
+    const d = cachedDrafts.find((item) => item.id === t.dataset.draftCopy);
+    if (d && d.content) {
+      await navigator.clipboard.writeText(d.content);
+      t.textContent = "복사됨!";
+      setTimeout(() => (t.textContent = "📋 원문 복사"), 1200);
+    }
+  } else if (t.dataset.draftDownload) {
+    const d = cachedDrafts.find((item) => item.id === t.dataset.draftDownload);
+    if (d) {
+      const a = document.createElement("a");
+      if (d.dataUrl) {
+        a.href = d.dataUrl;
+      } else if (d.content) {
+        const blob = new Blob([d.content], { type: d.mimeType || "text/plain;charset=utf-8" });
+        a.href = URL.createObjectURL(blob);
+      }
+      a.download = d.filename || `draft_${d.id}.md`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (!d.dataUrl && a.href) setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+  } else if (t.dataset.draftDel) {
+    await remove(roomRef(`drafts/${t.dataset.draftDel}`));
   } else if (t.dataset.surveyDel) {
     await remove(roomRef(`surveys/${t.dataset.surveyDel}`));
   } else if (t.dataset.blogDel) {
@@ -634,6 +836,8 @@ document.addEventListener("change", async (e) => {
     await update(roomRef(`surveys/${t.dataset.surveyStatus}`), { status: t.value });
   } else if (t.dataset.blogStatus) {
     await update(roomRef(`blogs/${t.dataset.blogStatus}`), { status: t.value });
+  } else if (t.dataset.draftStatus) {
+    await update(roomRef(`drafts/${t.dataset.draftStatus}`), { status: t.value });
   }
 });
 

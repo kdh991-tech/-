@@ -48,6 +48,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="memos">💬 공유 메모</button>
       <button class="tab" data-tab="images">🖼️ 이미지</button>
+      <button class="tab" data-tab="drafts">📝 초안·파일</button>
       <button class="tab" data-tab="surveys">📋 설문 현황</button>
       <button class="tab" data-tab="blogs">✍️ 블로그 보드</button>
       <button class="tab" data-tab="api">🤖 AI 연동</button>
@@ -108,6 +109,60 @@
           </div>
         </form>
         <div id="image-list" class="image-grid"></div>
+      </section>
+
+      <!-- 1-3. 초안·파일 공유함 -->
+      <section id="tab-drafts" class="tab-panel">
+        <details class="card accordion" open>
+          <summary>+ 새 초안 / 파일 올리기</summary>
+          <form id="draft-form" class="form-card inner-form">
+            <div class="form-row">
+              <select id="draft-author" required>
+                <option value="도형님" selected>👤 도형님</option>
+                <option value="비글">🐶 비글 (실장)</option>
+                <option value="피구">📱 피구 (대리)</option>
+                <option value="키루루">🔑 키루루 (사원)</option>
+                <option value="쿠링">🔔 쿠링 (사원)</option>
+                <option value="구구">🕊️ 구구 (인턴)</option>
+                <option value="꼬붕">🐣 꼬붕 (신입)</option>
+              </select>
+              <select id="draft-platform" required>
+                <option value="티스토리">티스토리</option>
+                <option value="네이버">네이버 블로그</option>
+                <option value="기타">기타 문서</option>
+              </select>
+            </div>
+            <input id="draft-title" type="text" placeholder="제목 / 파일 설명 (예: 모모치 해변 티스토리 초안) *" required />
+            <div class="form-row">
+              <input id="draft-keywords" type="text" placeholder="타겟 키워드 / 메모 (선택)" />
+              <input id="draft-file" type="file" accept=".md,.txt,.html,.htm,.csv,.json,.pdf,.doc,.docx,.hwp,.hwpx,.zip" />
+            </div>
+            <textarea id="draft-content" rows="4" placeholder="파일을 첨부하거나, 초안 본문을 여기에 직접 붙여넣으세요..."></textarea>
+            <div class="form-actions">
+              <span id="draft-upload-status" class="muted" style="margin-right:auto;"></span>
+              <button type="submit" id="draft-submit-btn" class="btn-primary">초안·파일 등록</button>
+            </div>
+          </form>
+        </details>
+
+        <div class="filter-bar">
+          <input id="draft-search" type="search" placeholder="제목·작성자·파일명·키워드 검색..." />
+          <select id="draft-platform-filter">
+            <option value="ALL">전체 플랫폼</option>
+            <option value="티스토리">티스토리</option>
+            <option value="네이버">네이버 블로그</option>
+            <option value="기타">기타 문서</option>
+          </select>
+          <select id="draft-status-filter">
+            <option value="ALL">전체 상태</option>
+            <option value="검수대기">검수대기</option>
+            <option value="수정필요">수정필요</option>
+            <option value="검수완료">검수완료</option>
+            <option value="반영완료">반영완료</option>
+          </select>
+        </div>
+
+        <div id="draft-list" class="stack-list"></div>
       </section>
 
       <!-- 2. 설문 현황판 -->
@@ -252,6 +307,10 @@
           <div class="api-box">
             <label>공유 이미지 목록 읽기 (GET — dataUrl base64 디코딩)</label>
             <code id="api-images-example"></code>
+          </div>
+          <div class="api-box">
+            <label>블로그 초안·파일 등록 (POST — content에 원문 텍스트 또는 dataUrl)</label>
+            <code id="api-drafts-example"></code>
           </div>
           <p class="muted small-note">
             ※ 위 URL에는 접속 키가 포함되어 있으므로 외부 공개 채널에 그대로 붙여넣지 마세요.
